@@ -1,0 +1,428 @@
+\section{The Smurf Basic module\label{sec:SmurfBasic}}
+For C/C++ programs, the corresponding APIs are defined in \args{smurf/smurf.h}. For Python3 programs, the corresponding module is \args{smurf}.
+
+\subsection{Smurf debugging output}
+The debugging output of Smurf library are disabled by default. User's can turn it on with \args{SmurfSetVerbose()}:
+\begin{lstlisting}[language=C++, caption={SmurfSetVerbose()\label{api:SmurfSetVerboseC}}]
+void SmurfSetVerbose(bool dbginfo);
+
+//Turn on debug info.
+SmurfSetVerbose(true);
+
+//Turn on debug info.
+SmurfSetVerbose(flase);
+\end{lstlisting}
+Set \args{dbginfo} to \args{true} turns on the debugging output and vice versa.
+
+\subsection{Core specification\label{api:Smurf.Core}}
+To begin with the \smurf framework, the first step is to define your Core and generate the Core specification with a Python script. To do so, we first initiate a \args{smurf.Core} object:
+\begin{lstlisting}[language=Python,caption={smurf.Core()\label{api:smurf.CoreP}}]
+import smurf
+	
+# Class:
+#	smurf.Core()
+	
+# Example: generate a Core object.
+core = smurf.Core()
+\end{lstlisting}
+
+Use \args{Smurf.Core.NewComponent()} to add Components into the Core :
+\begin{lstlisting}[language=Python,caption={smurf.Core.NewComponent()\label{api:Core.NewComponentP}}]
+# Prototype:
+#	smurf.Core.NewComponent(compname, comptype='OCTET', complen=1):
+
+# Example: Adding 3 Components "RegA", "RegB" and "RegC".
+core.NewComponent("RegA")
+core.NewComponent("RegB", 'UINT32')
+core.NewComponent("RegC", 'OCTET', 4)
+\end{lstlisting}
+
+\args{compname} is the name of the Component given as a string. \args{comptype} is of the types given in \Cref{tbl:ComponentTypes} as a string, and \args{complen} is the size of the Component (in its own type). In the example given in \Cref{api:Core.NewComponentP}, three different Components are added, which are namely:
+\begin{itemize}
+	\item \args{RegA} that has an ``OCTET'' (8 bit) value, 
+	\item \args{RegB} that has an ``UINT32'' (unsigned 32 bit) value, and 
+	\item \args{RegC} that has $4$ ``OCTET'' value which in total has $8 * 4 =32$ bits.
+\end{itemize}
+
+Once all the Components are added, the Core specification can be dumped into a file using \args{Smurf.Core.Save()}:
+\begin{lstlisting}[language=Python,caption={smurf.Core.Save()\label{api:Core.SaveP}}]
+# Prototype:
+#	smurf.Core.Save(filepath)
+
+# Example: saving the Core into a Core specification
+core.Save("./test.core")
+\end{lstlisting}
+
+\args{filepath} is the file path of the output Core specification file.
+
+This generates a Core specification file which actually is implemented as a JSON file that can be opened with other viewers such as a browser:
+\begin{lstlisting}[caption={test.core\label{test.core}}]
+{
+	"version": "1",
+	"components": {
+		"RegA": {
+			"type": "OCTET",
+			"len": 1
+		},
+		"RegB": {
+			"type": "UINT32",
+			"len": 1
+		},
+		"RegC": {
+			"type": "OCTET",
+			"len": 4
+		}
+	}
+}
+\end{lstlisting}
+
+
+
+
+\subsection{\smurf objects at code level}
+\subsubsection{Initialisation and free}
+To use the Smurf library in C/C++ programs, a Smurf session must be established first. The APIs are defined in the header ``smurf/smurf.h''.
+A Core specification (details in \Cref{api:Smurf.Core}) is required for the initialisation. It is also required that a path of the Trace to be provided during this procedure alongside its mode, which is either read or write. For a reading session, the Core specification is needed to interpret the Trace and for a writing session it determines how data are structured in the Trace. As of a general practice in C/C++ programs, the Smurf session needs to be freed by the end of its lifespam to recycle its resource.
+
+To initialise a Smurf session, use \args{InitSmurf()}:
+\begin{lstlisting}[language=C++, caption={InitSmurf()\label{api:InitSmurfC}}]
+Smurf* InitSmurf(
+const char *corepath, //Path of Core specificatoin.
+const char *tracepath, //Path of Trace file.
+int tracemode);	//Mode of Trace file.
+\end{lstlisting}
+
+The \args{Smurf*} returned by InitSmurf() is the handle of the newly initialised Smurf session. \args{corepath} and \args{tracepath} are the paths of the Core specification and the Trace respectively. There are currently $4$ modes available for the Trace mode argument \args{tracemode}:
+\begin{itemize}
+	\item To read a Trace, \args{tracemode} should be set to \args{SMURF\_TRACE\_MODE\_READ}.
+	\item To write a Trace, \args{tracemode} should be chosen from one of:
+	\begin{description}
+		\item[\args{SMURF\_TRACE\_MODE\_CREATE}] Creates a new Trace file. The file will be truncated if it already exists.
+		\item[\args{SMURF\_TRACE\_MODE\_APPEND}] Opens an existing Trace file and appending new Frames from its end.
+		\item[\args{SMURF\_TRACE\_MODE\_FIFO}] Creates a temporary First-In-First-Out (FIFO~\cite{FIFO}) at \args{tracepath}. The FIFO will be removed upon calling \args{FreeSmurf()}.
+	\end{description}
+\end{itemize}
+
+Notes about the \args{tracemode}:
+\begin{itemize}
+	\item Trace generated always has been set the permissions of all read and write (i.e. 0666 file mode).
+	\item \args{SMURF\_TRACE\_MODE\_READ} is used universaly to read Traces of a regular file (as created with \args{SMURF\_TRACE\_MODE\_CREATE}) or a FIFO (as created with \args{SMURF\_TRACE\_MODE\_FIFO}).
+	\item As indicated in POSIX statndard, when calling with \args{SMURF\_TRACE\_MODE\_FIFO}, the process will be blocked until the same FIFO Trace has been opened for read by another process. Behaviours of writing in or reading out the FIFO Trace are also consistent with the FIFO specifications in POSIX.
+	\item It is recommend to use \args{SMURF\_TRACE\_MODE\_FIFO} when dealing with exceptionally large Traces, as data written into the FIFO Trace will directly passed to the reader's end by the kernel without going through the harddisk. In constrast, when storage of the Trace is desired, \args{SMURF\_TRACE\_MODE\_CREATE} should be used instead. However, users should be minded that simutaneously reading a regular file Trace as it is being written may create a competition and thus synchronous issues.
+\end{itemize}
+
+By the end of the Smurf session, use \args{FreeSmurf()} to free the session:
+\begin{lstlisting}[language=C++,caption={FreeSmurf()\label{api:FreeSmurfC}}]
+void FreeSmurf(Smurf * smurf);
+\end{lstlisting}
+
+\args{FreeSmurf()} has no return value and \args{smurf} is the handle of the Smurf session to be freed, including allocated memory and other system resources such as file descriptors. If args{smurf} is initialised with \args{SMURF\_TRACE\_MODE\_FIFO}, then the associated FIFO Trace will also be deleted.
+
+Once a Smurf session has been initialised, the static \smurf objects described in \Cref{sec:SmurfObjects} can be directly accessed from the user program via data structures within the session \args{smurf}. Note that the structure definitions demonstrated in this section are simplified from the source code such that certain internal data structures are omitted.
+
+For Python3 programs, simply import the \args{smurf} module:
+\begin{lstlisting}[language=Python,caption={Importing Smurf module\label{api:ImportSmurfP}}]
+	import smurf
+\end{lstlisting}
+
+\subsubsection{Core}
+The Core is constructed from the Core specification \args{corepath} provided to \args{InitSmurf()}. Core is defined and accessed as:
+\begin{lstlisting}[language=C++, caption={struct SmurfCore\label{api:CoreC}}]
+typedef struct {
+	int ncomponents;	//Number of Core Components.
+	SmurfCoreComponent **components;	//Core Components.
+} SmurfCore;
+
+//Access.
+smurf->core; //Type: SmurfCore*
+\end{lstlisting}
+
+Note that \args{smurf->core} is a pointer to the Core object. Within the Core, \args{ncomponents} records the number of Components constitutes the Core and their entries are given as an array of their points. 
+
+In Python3, \args{smurf.Core.Load()} loads a Core specification into a Core object:
+\begin{lstlisting}[language=Python,caption={smurf.Core.Load()\label{api:Core.LoadP}}]
+# Prototype:
+#	smurf.Core.Load(filepath)
+
+# Example: load "test.core".	
+core = Smurf.Core.Load("test.core")
+\end{lstlisting}
+\args{filepath} is the path of the Core specification file to be loaded.
+
+\subsubsection{Component} 
+The Components are then defined and accessed as:
+\begin{lstlisting}[language=C++, caption={struct SmurfCoreComponent\label{api:ComponentC}}]
+typedef struct {
+	char *name; //Component name.
+	SmurfCoreComponentType type; //Component type.
+	size_t len; //Size of Component, measured by its type.
+} SmurfCoreComponent;
+
+//Access the i-th Component.
+smurf->core->components[i]; //Type: SmurfCoreComponent*
+\end{lstlisting}
+
+In particular, the \args{smurf->core->components[i]->type} is one of the following as in \Cref{tbl:ComponentTypes}:
+\begin{lstlisting}[language=C++, caption={enum SmurfCoreComponentType\label{api:ComponentTypeC}}]
+typedef enum {
+	UNDEFINED, 	//Error case.
+	BOOL, OCTET, STRING, 
+	INT16, UINT16, INT32, UINT32
+} SmurfCoreComponentType;
+\end{lstlisting}
+
+\args{smurf->core->components[i]->len} is the length of the Component measured by its type. That is, its value is $1$ if the Component has been declared as univariate, or $n$ if the Component has been declared as an array of size $n$. Only for the type \args{STRING}, \args{len} is the maximum number of characters in this Component.
+
+It is important to note that values of Components are not presented within the session \args{smurf} as the data strctures inside \args{smurf} records only the static information. Details of accessing the values of Components are given in \Cref{sec:FrameAPIsC}.
+
+In Python3, the Components are implemented as a dictionary member of the Core. It further has three members namely \args{name}, \args{type} and \args{len}:
+\begin{lstlisting}[language=Python,caption={smurf.Core.components\label{api:Core.componentsP}}]
+# class:
+#	smurf.Core.Component
+
+# Example: print Components in a Core "core"
+comps = core.components
+for c in comps:
+	print("Name:{:s}".format(comps[c].name))
+	print("Type:{:s}".format(comps[c].type))
+	print("Length:{:d}".format(comps[c].len))
+\end{lstlisting}
+\args{name} and \args{type} are the name and type of the Component in strings as described in \Cref{sec:SmurfObjects}. \args{len} is the length of the Component in its type(details in \Cref{sec:SmurfObjects}).
+
+
+\subsubsection{Trace}
+Once a Smurf session is initialised, its Trace is opened as a file descriptor in the user's process. Although the relevant resources will be released when the session is freed, the Trace object provides informatoin for management purposes.
+\begin{lstlisting}[language=C++, caption={struct SmurfTrace\label{api:TraceC}}]
+typedef struct {
+	char *path;	//Path of the Trace file.
+	int fd;		//File descriptor of Trace file.
+	int mode;	//Mode of Trace file as being initialised.
+	size_t offset;	//Current Frame offset.
+} SmurfTrace;
+
+//Accessing the Trace.
+smurf->trace; //Type: SmurfTrace*
+\end{lstlisting}
+
+Note that the Trace object should be read only and users should not modify its contents. \args{mode} records the value of \args{tracemode} as being initialised in \Cref{api:InitSmurf}. \args{offset} records the current position of Frame. When the Trace is initialised by \args{SMURF\_TRACE\_MODE\_FIFO}, \args{offset} is effectively the number of Frames read or written.
+
+In Python3, a Trace, \args{smurf.Trace}, needs first be initialised from a Core and then loaded from the file system using \args{smurf.Trace.Open()}. Note that currently in Python3 only Trace reading is supported.
+\begin{lstlisting}[language=Python,caption={smurf.Trace\label{api:Core.TraceP}}]
+# Class:
+#	smurf.Trace
+
+# Example: initialise from "core" and load a Trace at "filepath"
+trace = smurf.Trace(core)
+trace.Open(filepath)
+\end{lstlisting}
+
+\subsubsection{Frame}
+The Smurf library implements two types of Frame.
+
+\paragraph{Buffer Frame}
+A buffer Frame is allocated alongside session initialisation for quick access:
+\begin{lstlisting}[language=C++, caption={struct SmurfFrame\label{api:FrameC}}]
+typedef struct {
+	int len;	//Size of the Frame in bytes.
+	unsigned char *buf;	//Contents of Frame.
+} SmurfFrame;
+
+//Accessing the Frame buffer.
+smurf->frame; //Type: SmurfFrame*
+\end{lstlisting}
+Further details of Frame APIs are given in \Cref{sec:FrameAPIsC}.
+
+\paragraph{Self managed Frame}
+Alternatively, users may use self managed Frames for more flexibility. To create a self manged Frame within the Smurf session \args{smurf}, use \args{SmurfNewFrame()}:
+\begin{lstlisting}[language=C++, caption={SmurfNewFrame()\label{api:SmurfNewFrameC}}]
+SmurfFrame *SmurfNewFrame(Smurf * smurf);
+
+//The new self manged Frame newframe:
+newframe = SmurfNewFrame(smurf);
+\end{lstlisting}
+NULL is returned if \args{SmurfNewFrame()} failed.
+
+It lies in the user's responsibility to free the self managed Frames at the end of its lifecycle by calling \args{FreeFrame()}:
+\begin{lstlisting}[language=C++, caption={SmurfFreeFrame()\label{api:SmurfFreeFrameC}}]
+void *SmurfFreeFrame(SmurfFrame * frame);
+
+//Free the self manged Frame frame:
+SmurfFreeFrame(frame);
+\end{lstlisting}
+
+\args{CopyFrame()} copies a Frame from one to another:
+\begin{lstlisting}[language=C++, caption={CopyFrame()\label{api:CopyFrameC}}]
+int *CopyFrame(SmurfFrame * dstframe, SmurfFrame * srcframe);
+
+//Example: copy the buffer Frame into a self manged Frame
+SmurfFrame *newframe;
+newframe = SmurfNewFrame(smurf);
+CopyFrame(newframe, smurf->frame); //newframe is a copy of the buffer Frame.
+\end{lstlisting}
+On success, \args{SMURF\_SUCCESS} is returned. Otherwise \args{SMURF\_ERROR} is returned.
+
+In Python3 Frames are defined as the class \args{smurf.Frame}:
+\begin{lstlisting}[language=Python,caption={smurf.Frame\label{api:FrameP}}]
+# Class:
+#	smurf.Frame
+\end{lstlisting}
+
+It is returned by calling \args{smurf.Trace.NextFrame()}. Further details are provided in \Cref{sec:ReadTraces}.
+
+
+\subsection{Component Instances within a Frame\label{sec:FrameAPIsC}}
+The Smurf library provides the \args{FrameComp} structure as a handle to access the Component Instances:
+\begin{lstlisting}[language=C++, caption={struct FrameComp\label{api:FrameCompC}}]
+typedef struct{
+	const char *name;	//Name of the Component.
+	SmurfCoreComponentType type;	//Type of the Component.
+	size_t typesize;	//Unit size of the Component.
+	const char *typestr;	//Type of Component in string.
+	size_t size;	//Size of the Component in its type.
+	CompVal val;	//Pointer to its value.
+} FrameComp;
+\end{lstlisting}
+
+The members in a \args{FrameComp} object should be read only since they are derived from the Core specification, except for \args{val}. 
+
+\args{name} is the name of the Component. \args{type} is as defined in \Cref{api:ComponentTypeC} and \args{typestr} are their correponding strings, e.g. \args{"BOOL"}, \args{"OCTET"} and \args{"UINT16"}, etc. 
+
+\args{typesize} is the unit size of this Component in bytes. This is equivalent to \args{sizeof(comp\_c99type)} in C/C++ where \args{comp\_c99type} is the referenced C99 data type of the Component in \Cref{tbl:ComponentTypes}, for example, it is $1$ for \args{BOOL}, \args{OCTET}, $2$ for \args{INT16} and \args{UINT16} and $4$ for \args{INT32} and \args{UINT32}. \args{size} gives the size of the Component in its type. That is, for univariate Components it is $1$, and the number of elements for Components defined as arrays. For \args{STRING} typed Components \args{typesize} and \args{size} are constantly $1$.
+
+The value(s) of a Component Instance is given by the member \args{val}, which type is defined as a union of pointers:
+\begin{lstlisting}[language=C++, caption={union CompVal\label{api:CompValC}}]
+typedef union {
+	uint8_t *BOOL;
+	uint8_t *OCTET;
+	char *STRING;
+	int16_t *INT16;
+	uint16_t *UINT16;
+	int32_t *INT32;
+	uint32_t *UINT32;
+} CompVal;
+\end{lstlisting}
+
+%FetchComp() missing.
+Then \args{FetchComp()} can be used to fetch a Component Instance from a Frame by its name:
+\begin{lstlisting}[language=C++, caption={FetchComp()\label{api:FetchCompC}}]
+int FetchComp(FrameComp * comp, SmurfFrame * frame, const char *compname);
+
+//Example: fetch "RegA" from the buffered Frame
+FrameComp comp = {0}; //The Component Instance.
+FetchComp(&comp, smurf->frame, "RegA");
+\end{lstlisting}
+
+Users can then read or alter the Component Instances using the corresponding members of \args{comp.val}. The total size of \args{comp.val} in bytes can be computed by \args{(comp.typesize * comp.size)}.
+\begin{lstlisting}[language=C++, caption={Accessing value(s) of a Components Instance in C/C++\label{api:AccessValC}}]
+//Examples of accessing Component Instances.
+//e.g. for univariate Component Instances:
+*comp.val.OCTET;	//Type: uint8_t, or
+comp.val.OCTET[0]; //Type: uint8_t
+
+//For arrayed Compoent Instances, the i-th value is:
+comp.val.UINT16[i];	//Type: uint_16
+\end{lstlisting}
+
+For Python3, the Component Instances are derived from the class \args{smurf.Core.Component} and are implemented as a member of Frame \args{smurf.Frame.ComponentInstance}:
+\begin{lstlisting}[language=Python,caption={smurf.Trace\label{api:Core.TraceP}}]
+# Class:
+#	smurf.Frame.ComponentInstance(smurf.Core.Component)
+
+# Example: print the value of "RegA" in a Frame "frame"
+rega = frame.components["RegA"]
+print("Value: {}".format(rega.val)) # In its own type.
+print("Value(raw): {}".format(rega.raw)) # In bytes.
+\end{lstlisting}
+\args{smurf.Frame.ComponentInstance} has two additional member comparing to its parent, namely:
+\begin{itemize}
+	\item \args{val} is the value as in the type indicated by \args{type}.
+	\item \args{raw} is the value in bytes. 
+\end{itemize}
+
+
+\subsection{Generate Traces}
+Trace generation are normally done by the Emulator in the \smurf framework and thus the relevant functionalities are provided only in C/C++ since they are the general languages for the Emulator. The lower level APIs for Trace generation are provided in the Basic module whilst the more sophisticated ones are introduced in \Cref{sec:SmurfEmulator}.
+
+To generate a Trace, the Smurf session must be initialised with \args{tracemode} specified as either \args{SMURF\_TRACE\_MODE\_CREATE} or \args{SMURF\_TRACE\_MODE\_APPEND}. A user may choose to write the buffer Frame into the Trace or a self managed one.
+
+\args{SmurfWrite()} writes the buffer Frame into the Trace within the same Smurf session:
+\begin{lstlisting}[language=C++, caption={SmurfWrite()\label{api:SmurfWriteC}}]
+int SmurfWrite(Smurf * smurf);
+
+//Example:
+SmurfWrite(smurf);
+smurf->frame; //The next Frame.
+\end{lstlisting}
+On success, \args{SMURF\_SUCCESS} is returned. Otherwise \args{SMURF\_ERROR} is returned.
+
+Alternatively, users can use \args{SmurfWriteFrame()} to write a self managed Frame into a Trace of a Smurf session:
+\begin{lstlisting}[language=C++, caption={SmurfWriteFrame()\label{api:SmurfWriteFrameC}}]
+int SmurfWriteFrame(Smurf * smurf, SmurfFrame * frame);
+
+//Example: fetch the i-th Frame and add it back to Trace.
+SmurfFrame *newframe;
+newframe = FetchFrame(newframe, smurf, i);
+//You may also modify newframe between.
+SmurfWriteFrame(smurf, newframe); //Add newframe back into the Trace.
+\end{lstlisting}
+On success, \args{SMURF\_SUCCESS} is returned. Otherwise \args{SMURF\_ERROR} is returned.
+
+The Python3 \args{smurf} module does not support Trace generation currently.
+
+
+\subsection{Read Traces\label{sec:ReadTraces}}
+The Smurf library provides two styles of Trace reading:
+\begin{itemize}
+	\item Sequential reading. The Frames are read out one by one from the beginning towards the end.
+	\item Indexed reading. The user can pick a Frame to read by its index in the Trace.
+\end{itemize}
+
+\subsubsection{Sequential reading}
+Sequential reading is implemented using the buffer Frame in the Smurf session by \args{SmuefNextFrame()}:
+\begin{lstlisting}[language=C++, caption={SmurfNextFrame()\label{api:SmurfNextFrameC}}]
+int SmurfNextFrame(Smurf * smurf);
+
+//Example: get next Frame 
+SmurfNextFrame(smurf);
+smurf->frame; //The next Frame.
+\end{lstlisting}
+Each call to \args{SmurfNextFrame()} updates the buffer Frame \args{smurf.frame} to the new Frame read. On success the index of the newly read Frame is returned (counting from $1$). A return value of $0$ indicates the End of File (EOF) is reached and the buffer Frame is unchanged. \args{SMURF\_ERROR} is returned in case of error.
+
+Sequential reading is also supported in Python3 by \args{smurf.Trace.NextFrame()}:
+\begin{lstlisting}[language=Python,caption={smurf.Trace.NextFrame()\label{api:smurf.Trace.NextFrame}}]
+# Prototype:
+#	smurf.Trace.NextFrame()
+
+# Example: extract frames from the Trace "trace"
+frames = list()
+while True:
+	frame = trace.NextFrame() # Returns the next Frame.
+	if None == frame: # EOF
+		break
+	frames.append(frame)
+\end{lstlisting}
+
+\subsubsection{Indexed reading}
+Indexed reading is implemented by \args{SmurfFetchFrame()} which fetches the Frame within the Trace by its index:
+\begin{lstlisting}[language=C++, caption={SmurfFetchFrame()\label{api:SmurfFetchFrameC}}]
+int SmurfFetchFrame(SmurfFrame * frame, Smurf * smurf, unsigned long frameno);
+
+//Example: fetching the i-th Frame into a self managed Frame.
+SmurfFrame *newframe;
+newframe = SmurfNewFrame(smurf);
+SmurfFetchFrame(newframe, smurf, i); //The i-th Frame is fetched into newframe.
+\end{lstlisting}
+
+On success \args{SmurfFetchFrame()} returns the total size of the Frame values in bytes. A return value of $0$ indicates the Frame could not be fetched, commonly caused by the specified $frameno$ exceeding the total number of Frames in the Trace. In cases of error, \args{SMURF\_ERROR} is returned.
+
+\args{SmurfFetchFrame()} only works on regular Trace files (see \args{S\_ISREG} section in~\cite{UnixFileTypes}). This also means it is not compatible for Trace files created with mode \args{SMURF\_TRACE\_MODE\_FIFO}. Also fetching a Frame does not change the Trace offset \args{smurf->trace->offset}.  A noticable feature of \args{SmurfFetchFrame()} is that it can also be used on Traces opened for write (\args{SMURF\_TRACE\_MODE\_CREATE}) or append (\args{SMURF\_TRACE\_MODE\_APPEND}).
+
+
+\subsection{Summary}
+\Cref{tbl:BasicSummary} summarises different functionalities in the Basic module both in Python3 and C/C++.
+
+\begin{table}
+	\centering
+	\input{Tables/BasicSummary.tex}
+	\caption{Summary of Basic module\label{tbl:BasicSummary}}
+\end{table}

@@ -1,0 +1,19 @@
+[project]
+name = "seal"
+version = "1.0.0"
+authors = [
+  { name="Saltiny", email="yanyansmajesty@outlook.com" },
+]
+description = "Seal package"
+readme = "README.md"
+requires-python = ">=3.7"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies=["numpy", "scipy", "tqdm", "base", "parse", "collections"]
+
+[project.urls]
+"Homepage" = "https://github.com/sca-research/smurf"
+"Bug Tracker" = "https://github.com/sca-research/smurf/issues"

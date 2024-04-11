@@ -1,0 +1,9 @@
+*.bcf
+*.aux
+*.bbl
+*.blg
+*.log
+*.toc
+*.run.xml
+*.synctex.gz
+*-eps-converted-to.pdf

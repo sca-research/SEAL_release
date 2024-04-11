@@ -1,0 +1,162 @@
+\section{The Smurf Emulator module\label{sec:SmurfEmulator}}
+The corresponding APIs are defined in \args{smurf/emulator.h}. Since Emulators are normally written in C/C++ languages, there is no corresponding Python3 module for this Smurf module.
+
+\subsection{Synchronising Component Instances}
+Although the Smurf Basic module (\Cref{sec:SmurfBasic}) provides a method to construct Frames that can be written into the Trace, it also requires the user to manually update the Frame whenever it is to be written. Such procedures are normally highly repetitive; thus the Smurf Emulator module provides a synchronisation mechanism that synchronises Smurf Component Instances with internal variables of the Emulator into the  within the buffer Frame. Together with the buffer Frame related APIs (\Cref{api:SmurfWriteC} particularly), this greatly reduces the effort for constructing new Frames.
+
+\api{SmurfBind()} binds the internal variables of Emulator to the Component Instances in the buffer Frame of the Smurf session \args{smurf}:
+\begin{lstlisting}[language=C++, caption={SmurfBind()\label{api:SmurfBindC}}]
+int SmurfBind(Smurf * smurf, const char *comp, const void *var);
+
+//Example: binding variables
+uint32_t cycle = 0;
+uint32_t regs[16] = {0};
+
+//Bind univariate Component "Cycle"
+SmurfBind(smurf, "Cycle", &cycle);
+//Bind array Component "Regs"
+SmurfBind(smurf, "Regs", regs);
+\end{lstlisting}
+
+\args{comp} is the name string of the Component that is to be bound and \args{val} is a pointer to the source internal variable of the Emulator, or the address of the first element if it is an array. \args{SmurfBind} relies on user's responsibility to ensure that the types of \args{comp} and \args{var} are matched as in \Cref{tbl:ComponentTypes}. On success \args{SmurfBind()} returns \args{SMURF\_SUCCESS}, or \args{SMURF\_ERROR} otherwise.
+
+Once a variable is bound, \args{SmurfSync()} synchronises the bound Component Instances within the buffer Frame of Smurf session \args{smurf} from the source variables of the Emulator:
+\begin{lstlisting}[language=C++, caption={SmurfSync()\label{api:SmurfSyncC}}]
+void SmurfSync(Smurf * smurf);
+
+//Example: Synchronise and write the buffer Frame into Trace.
+//Synchronise bound Component Instances.
+SmurfSync(smurf);
+//Write the buffer Frame into the Trace.
+SmurfWrite(smurf);
+\end{lstlisting}
+
+The example in \Cref{api:SmurfSyncC} shows a typical usage of \args{SmurfSync()} that is called before writing the updated buffer Frame into the Trace.
+
+
+\subsection{Smurf IO}
+The submodule Smurf IO provides a mechanism for Emulators to create a synchronised virtual serial port interface that can interact with the hosting system as if being a real device.
+
+Note that Smurf IO can be independently used without any Smurf session.
+
+\subsubsection{Host: configure virtual interface in Emulator}
+Like a general device in any UNIX systems, the virtual interface appears as a file in the system. The first step that needs to be done by the Emulator is to create such a Smurf interface (Smurf IF) using \args{SioOpen()}:
+\begin{lstlisting}[language=C++, caption={SioOpen()\label{api:SioOpenC}}]
+SmurfIO* SioOpen(const char* ifpath);
+
+//Example: create a Smurf IF at "/tmp/smurfif"
+SmurfIO sif = NULL;
+sif = SioOpen("/tmp/smurfif");
+\end{lstlisting}
+
+\args{ifpath} is the file path in the system. On success \args{SioOpen()} returns the handle of the newly created Smurf IF, or a \args{NULL} pointer is returned if failed. A file specified by \args{ifpath} is created on the successful return of \args{SioOpen()}.
+
+The Smurf IF must be connected to another end before any data can be transmitted over it. \args{SioWaitConn()} waits for a connection to be established:
+\begin{lstlisting}[language=C++, caption={SioWaitConn()\label{api:SioWaitConnC}}]
+int SioWaitConn(SmurfIO * sif);
+	
+//Example: wait for "sif" to be connected
+SioWaitConn(sif);
+\end{lstlisting}
+
+\args{sif} is the handle of the Smurf IF waiting to be connected. On success \args{SioWaitConn()} returns \SMURFSUCCESS indicated \args{sif} is now connected, or \SMURFERROR if it failed.
+
+Note that \args{SioWaitConn()} is blockage, i.e. it blocks the procedure until a connection is received or an error is occurred.
+
+Within the \args{SmurfIO} structure, users can check the Smurf IF using its members with macros in \args{smurf/emulator.h}:
+\begin{lstlisting}[language=C++, caption={struct SmurfIO\label{api:SmurfIOC}}]
+typedef struct 
+{
+	int type; //Type of the Smurf IF
+	int stat; //Status of the Smurf IF
+} SmurfIO;
+\end{lstlisting}
+
+\args{type} indicates the type of the Smurf IF, it is either:
+\begin{itemize}
+	\item \args{SMURF\_IO\_SERVER} indicating it is the server side that usually is the Emulator that waits for a connection, or
+	\item \args{SMURF\_IO\_CLIENT} indicating this is the client side that is usually the user program that handles the IO of simulated device.
+\end{itemize}
+
+\args{stat} is the status of the Smurf IF, its possible values are:
+\begin{itemize}
+	\item \args{SMURF\_IO\_WAITCONN} indicates that it is a newly initialised Smurf IF where the connection is to be established.
+	\item \args{SMURF\_IO\_READY} indicates that the Smurf IF is connected and ready to be used.
+	\item \args{SMURF\_IO\_EOF} indicates that the other end of connection has been closed.
+	\item \args{SMURF\_IO\_ERROR} is the erroneous state of the Smurf IO.
+\end{itemize}
+
+%Emulator required to pass siogetchar() and sioputchar() to the binary image.
+\args{SioGetchar()} and \args{SioGet()} are provided for basic IO with the Smurf IF:
+\begin{lstlisting}[language=C++, caption={SioGetchar()\label{api:SioGetcharC}}]
+int SioGetchar(SmurfIO *);
+
+//Example: read a byte from Smurf IF "sif".
+int c;
+c = SioGetchar(sif);
+\end{lstlisting}
+
+\begin{lstlisting}[language=C++, caption={SioPutchar()\label{api:SioPutcharC}}]
+int SioPutchar(SmurfIO *, const int charval);
+
+//Example: write a byte "c" into Smurf IF "sif".
+char c = 0;
+SioGetchar(sif, c);
+\end{lstlisting}
+
+\args{SioGetchar()} and \args{SioPutchar()} are synonyms to \args{getchar()} and \args{putchar()} in standard C library with \args{sif} being the Smurf IF to be used. Note that similar to most read and write APIs in UNIX systems, \args{SioGetchar()} blocks until a byte is received or an error has occurred, whilst \args{SioPutchar()} returns immediately after the sending request is issued to the Smurf IF.
+
+Note that Smurf IO covers only data transmission between the outside interactive program and the Emulator. It is then the responsibility of the Emulator to provide a communication mechanism between the Emulation and the binary image to be emulated. A general practice of implementing such communication channel is through reading or writing a reserved memory address, resembling to the UART interfaces of many commercial devices.
+
+By the end of the life cycle of the Smurf IF, use \args{SioClose()} to release it:
+\begin{lstlisting}[language=C++, caption={SioClose()\label{api:SioCloseC}}]
+void SioClose(SmurfIO *sif);
+
+//Example: close a Smurf IF "sif"
+SioClose(sif);
+\end{lstlisting}
+
+\subsubsection{Client: connect to Smurf IF from interactive program}
+For C/C++ programs, use \args{SioConnect()} to connect to a Smurf IF:
+\begin{lstlisting}[language=C++, caption={SioConnect()\label{api:SioConnectC}}]
+SmurfIO *SioConnect(const char *sifpath);
+
+//Example: connect to a Smurf IF at "/tmp/sioif"
+SmurfIO* sio;
+sio = SioConnect("tmp/sioif");
+\end{lstlisting}
+
+\args{sifpath} is the file path of the Smurf IF as created by the host (i.e. normally the Emulator). On success return, the handle of the newly established Smurf IF (a pointer to a \args{SmurfIO} object) is returned. Otherwise a \args{NULL} pointer is returned indicating the establishment of a connection is failed.
+
+Note that \args{SioConnect()} is also blockage , i.e. it blocks the process until the connection is established or an error occurs.
+
+Once a connection is established, the user process can use \args{SioGetchar()}(~\Cref{api:SioGetcharC}) and \args{SioPutchar}(~\Cref{api:SioPutcharC}) to receive and send data through the channel. The established Smurf IF needs to be later freed by \args{SioClose()}(~\Cref{api:SioCloseC}).
+
+%In Python3
+Smurf IF can also be used in Python3 clients. The first step is to initialise a \args{smurf.IO} object with the file path of the Smurf IF:
+\begin{lstlisting}[language=Python,caption={smurf.IO\label{api:smurf.IOP}}]
+# Class:
+#	smurf.IO(sifpath)
+
+# Example: connecting to Smurf IF at "/tmp/sioif"
+sif = smurf.IO("/tmp/sioif")
+\end{lstlisting}
+
+Initiating a \args{smurf.IO} object, which is also blockage, automatically connects to the Smurf IF specified by \args{sifpath}. It then can send and receive data using \args{smurf.IO.Getchar()} and \args{smurf.IO.Putchar()}:
+\begin{lstlisting}[language=Python,caption={smurf.IO.Getchar()\label{api:smurf.IO.Getchar}}]
+	# Prototype:
+	#	smurf.IO.Gettchar()
+	
+	# Example: send a byte 0x00 through Smurf IF "sif"
+	recv_b = sif.Getchar()
+\end{lstlisting}
+
+\begin{lstlisting}[language=Python,caption={smurf.IO.Putchar()\label{api:smurf.IO.Putchar}}]
+# Prototype:
+#	smurf.IO.Putchar(a_byte)
+
+# Example: send a byte 0x00 through Smurf IF "sif"
+sif.Putchar(bytes([0]))
+\end{lstlisting}
+
+The input \args{a\_byte} and the returned variable \args{recv\_b} are both of type \args{bytes}. Like their C correspondences \args{SioGetchar()}(~\Cref{api:SioPutcharC}) and \args{SioPutchar()}(~\Cref{api:SioGetcharC},) \args{smurf.IO.Getchar()} and \args{smurf.IO.Putchar()} are blockage and non blockage respectively.

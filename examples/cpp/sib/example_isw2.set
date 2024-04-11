@@ -1,0 +1,188 @@
+mov r8,r8
+
+mov r8,r8
+
+ldrb r6,[r0,#0x0]
+@@$ src r0 &a
+@@$ dst r6 a0 
+
+ldrb r5,[r1,#0x0]
+@@$ src r1 &b
+@@$ dst r5 b0 
+
+ldrb r3,[r0,#0x4]
+@@$ src r0 &a
+@@$ dst r3 a1 
+
+ldrb r7,[r1,#0x4]
+@@$ src r1 &b
+@@$ dst r7 b1 
+
+ldrb r2,[r2,#0x0]
+@@$ src r2 rnd
+@@$ dst r2 rnd0
+
+ldrb r1,[r4,r5]
+@@$ src r4 &table
+@@$ src r5 b0
+@@$ dst r1 logb0
+
+ldrb r0,[r4,r6]
+@@$ src r4 &table
+@@$ src r6 a0
+@@$ dst r0 loga0
+
+stall by LDR
+
+adds r0,r0,r1
+@@$ src r0 loga0
+@@$ src r1 logb0
+@@$ dst r0 s
+
+mov r1,r11
+@@$ src, r11, const
+@@$ dst, r1, const
+
+adds r0,r0,r1
+@@$ src r0 s
+@@$ src r1 const
+@@$ dst r0 s+const
+
+ldrb r1,[r4,r0]
+@@$ src r4 &table
+@@$ src r0 s + const
+@@$ dst r0 a0b0
+
+stall by LDR
+
+negs r0,r6
+
+movs r4,#0x20
+
+asrs r0,r4
+
+ands r0,r5
+
+negs r0,r0
+
+asrs r0,r4
+
+ands r1,r0
+
+mov r4,r8
+
+ors r1,r2
+
+strb r1,[r4,#0x0]
+
+mov r1,r9
+
+ldrb r0,[r1,r6]
+
+ldrb r4,[r1,r7]
+
+stall by LDR
+
+adds r0,r0,r4
+
+mov r4,r11
+
+adds r0,r0,r4
+
+ldrb r4,[r1,r0]
+
+stall by LDR
+
+negs r0,r6
+
+movs r6,#0x20
+
+asrs r0,r6
+
+ands r0,r7
+
+negs r0,r0
+
+asrs r0,r6
+
+ands r0,r4
+
+ors r2,r0
+
+ldrb r0,[r1,r3]
+
+ldrb r4,[r1,r5]
+
+stall by LDR
+
+adds r0,r0,r4
+
+mov r4,r11
+
+adds r0,r0,r4
+
+ldrb r4,[r1,r0]
+
+stall by LDR
+
+negs r0,r3
+
+asrs r0,r6
+
+ands r0,r5
+
+negs r0,r0
+
+asrs r0,r6
+
+ands r0,r4
+
+ors r0,r2
+
+ldrb r5,[r1,r3]
+
+ldrb r4,[r1,r7]
+
+stall by LDR
+
+adds r5,r5,r4
+
+mov r2,r11
+
+adds r5,r5,r2
+
+ldrb r4,[r1,r5]
+
+stall by LDR
+
+negs r5,r3
+
+asrs r5,r6
+
+ands r5,r7
+
+negs r5,r5
+
+asrs r5,r6
+
+ands r4,r5
+
+mov r1,r8
+
+ors r4,r0
+
+strb r1,[r1,#0x4]
+
+strb r4,[r1,#0x4]
+
+mov r8,r8
+
+mov r8,r8
+
+ldr r4,[PC+#0x14]
+
+stall by LDR
+
+movs r5,#0x00
+
+str r5,[r4,#0x0]

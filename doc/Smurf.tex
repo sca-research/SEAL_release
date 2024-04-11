@@ -1,0 +1,209 @@
+\documentclass[]{report}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{amsfonts}
+\usepackage{cleveref}
+\usepackage{verbatim}
+\usepackage{listings}
+\lstset{basicstyle=\footnotesize\ttfamily, breaklines=true, frame=single, captionpos=b, tabsize=2,upquote=true}
+\crefname{lstlisting}{listing}{listings}
+\Crefname{lstlisting}{Listing}{Listings}
+\usepackage{graphicx}
+\usepackage{dirtree}
+
+\usepackage{todonotes}
+
+%Bibliography.
+\usepackage[backend=biber]{biblatex}
+\addbibresource{references.bib}
+
+%Type setting for numbering.
+%\setcounter{tocdepth}{3}
+%\setcounter{secnumdepth}{3}
+
+% Title Page
+\title{$\mathcal{S}$ide-channel $\mathcal{M}$atters: a $\mathcal{U}$niversal po$\mathcal{R}$table $\mathcal{F}$ramework\\ The \smurf Library}
+\author{Yan Yan}
+
+\include{macro}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+	\smurf is a framework/library for leakage simulator development.
+\end{abstract}
+
+
+\tableofcontents
+
+
+\chapter{Introduction}
+
+
+\begin{comment}
+\section{An overview: designing a crypto device}
+Designing a cryptographic device with side channel awareness is complex. The procedure involves certain roles and the processes:
+\begin{itemize}
+	\item The \textbf{Hardware designer} designs the hardware with Hardware Design Languages (HDL) such as VHDL or Verilog, and then
+	\item the \textbf{Software developer} provides the cryptographic software that would be executed on the device.
+	\item Finally the \textbf{side channel Analysts} evaluates the potential leakages of the implementation that has both hardware and software integrated.
+\end{itemize}
+
+Several iterations of the procedure are needed alongside revisions. However, participants of different roles each requires a highly dedicated set of skills and are working in very different technical terminologies. As such, bridging the participants is vital yet it can rarely be found suitable candidates that are capable to have coverage over such a wide field of knowledge in reality. This contradiction has grown over the years becoming one of the most significant obstacle among the industry.
+\end{comment}
+
+\section{Leakage simulator}
+Leakage simulators are simulators enhanced with the functionality of producing leakage traces. They take as input cryptographic implementations cross compiled into binary images on the target platforms, and output leakage traces by applying artificial leakage models to the simulation.
+
+%[Pros and cons]
+Leakage simulators are very useful tools for early stage side channel evaluations as an alternative to real devices. Specifically, they have the advantages of:
+\begin{itemize} %Pros
+	\item \textbf{Low cost} There is no need for real hardware and thus the manufacturing cost are saved. It also made it possible for massive leakage trace generation in parallel, as much as the computational power is affordable.
+	\item \textbf{Flexibility} The users can customise the leakage simulator according to the needs, particularly when the leakage simulator is open sourced. For instance, it may allow any chosen fault to be injected at any point during the execution which, in contrast, is very difficult and costly to be achieve on real devices.
+	\item \textbf{Better explanatory} Since the leakage are simulated its components can be broken down easily under a known leakage model. This particularly useful in analysing the causes when leakages are detected. This is rather a difficult task for real devices due to physical constrains including synchronisation and measurement errors, especially under a non invasive setting.
+\end{itemize}
+
+%Cons
+On the other hand, it must be noted that leakage simulator has its constrains. Above all, the quality of a leakage simulator is determined by the quality of the leakage model it employed, which is often judged by its representativeness towards physical devices. Hence certain degree of error is inevitable and it is an active research topic improving the modelling methods to mitigate such error. In reality, leakage simulators also must face the problem black box modelling, i.e. the leakage models are modelled by third parties that does not necessarily have access to the exact hardware design. This is typically seen on commercial products since their hardware designs are often propitiatory.
+
+
+\paragraph{Examples of leakage simulator}
+A simplest example is the Hamming weight simulators which are frequently seen in side channel literatures. Its leakage at each time point is simulated simply by summing the Hamming weights of all operands. The popularity of Hamming weight could be traced back to the earliest side channel literatures such as ~\cite{CPA} due to its empirical successful application on real devices and it has lasted even until today. Alternatively, Hamming distance has also been used in a similar manner when people trying to capture transitional leakage between two intermediates~\cite{CPA}.
+
+However, as the semiconductor technology evolves over the decades, Hamming weight can now hardly be seen as a well captured leakage model for the latest devices. Particularly due to the fact that none of the microarchitecture factors has been taken into account in the Hamming weight model whereas in reality they have been shown to be significantly contributing to the leakage. The ELMO~\cite{ELMO} project is a remarkable example that addressed this issue by introducing an abstracted ELMO architecture that consists an ALU and pipeline. The ELMO architecture enables the leakage to be depicted with a better granularity since the leakage model is taking more detailed intermediates rather than simply the operands. ELMO also proposed the idea of depicting the leakage model as a linear function of the intermediates with coefficients derived from regressing the real traces. As a result, ELMO traces are more realistic and hence better leakage coverage than simply Hamming weight and Hamming distances. ELMO has later spawned the GILES\cite{GILES} which additionally supports fault injection.
+
+A further step down the line is the \uelmo project~\cite{SiModel,SiReverse}. Comparing with its predecessor, \uelmo is built on a more realistic architecture rather than an abstraction as did by ELMO which allows leakage model to be defined with further realisticness. Since more intermediates are captured during the simulation, \uelmo also creates a better potential of portability for the proving tools used by provable side channel analysis (more details in \Cref{sec:ProvableSCA}). However, there are certain practicability flaws in \uelmo. First of all, having access to the architectural information is generally a difficult task, especially for commercial products where the designs are proprietary. Secondly, it is also practically difficult to include every component in a processor into the leakage model due to its complexity. In case of \uelmo, the architecture was derived from reverse engineering the device~\cite{SiReverse} and then a selection process (details in \cite{SiModel}) is needed to produce a set of architectural components that are significant to leakage. 
+
+%[Other leakage simulators.]
+
+\section{Provable side channel and the proving tools\label{sec:ProvableSCA}}
+[I need input from Ines on this topic...]
+
+
+\section{The \smurf solution}
+\subsection{History: from ELMO to \uelmo}
+The initiative of \smurf stems from the ELMO~\cite{ELMO} project. The goal was to provide a proof of concept for building a more sophisticated leakage simulator that captures architectural leakage context. The code was developed based on the open sourced Thumbulator~\cite{Thumbulator}. As a prototype of its kind, ELMO nicely simulated the leakage of its targeted device which is an ARM Cortex-M0 on a STM32F0 board.
+
+The ELMO leakage simulator has later been restructured into GILES~\cite{GILES}, which additionally supported fault injection simulation. The decision to restructure ELMO was made due to the fact that the code was highly entangled with Thumbulator and lack comprehensible extensibility. The restructured GILES takes a configuration file in JSON format for coefficients in the leakage model which was hardcoded in the original ELMO. Also as a side project, GILES additionally provides the functionality of fault injection simulation.
+
+Although GILES was intended to have a generic framework that could be reused for further development of other leakage simulators, it was later found unsatisfactorily meeting this expectation in the \uelmo project. Firstly, GILES is written in C++ and its interface to other emulators has been designed at the code level, that is, to reuse the GILES framework the developer is required to integrate the source code of the emulator into GILES code base and then recompile the integrated code to generate the executable.  As a generic solution, such design could be problematic in certain scenarios, e.g. developers might need to solve problems caused by cross compiling when the emulator is not written in C/C++, and/or part of the emulator must be adapted to be compatible to GILES' code interface. Secondly, GIELS' interface are defined based on the abstracted ELMO architecture. This directly caused the GILES' framework being abandoned during the development of \uelmo, since it is based on a realistic architecture that is not compatible with ELMO's.
+
+\subsection{The \smurf framework}
+Reviewing the predecessors, it does not take long to conclude that there is a great engineering difficulty in implementing a leakage simulator platform that can invoke a third party emulator and apply a customisable leakage model to generate leakage traces in a comprehensive manner. Therefore comes the idea of \smurf: rather than plugging different components into a generic leakage simulator platform as attempted in GILES, \smurf inverts the approach by being a ``middleware''. That is, it is designated to be a library that is serves as a plugin to different components providing a data exchanging mechanism.
+
+\smurf focuses on two major tasks during the life cycle of a leakage simulator:
+\begin{itemize}
+	\item \smurf  provides an universal interface to the emulator for exporting execution traces, i.e. execution details such as states of registers, flags and buses during the emulation. The Execution Traces are store in a portable format. The execution traces are combined with the measured traces from real devices to deduce the leakage model, which then to be integrated into the leakage simulator. Finally the simulated leakage traces are generated for vulnerability evaluation where \smurf can help porting information from the emulator to the leakage simulator.
+	
+	\item \smurf also provides a set of universal interfaces for the leakage simulator to interact with the proving tools. Firstly, it provides an interface of instructing the leakage simulator to annotate the simulated traces with symbolic information. Secondly, it provides the functionality to export the symbolic traces, i.e. the simulated traces with annotated symbolic information, that can later be imported to proving tools in the back end with \smurf.
+\end{itemize}
+
+In the technical aspect, the \smurf design prioritises portability and modularity. \Cref{fig:Overview} summaries the framework.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{./Figures/Overview.eps}
+	\caption{An Overview of \smurf \label{fig:Overview}}
+\end{figure}
+
+
+\chapter{User's Manual}
+\section{Introduction}
+The design of \smurf follows the concept of Object Oriented and is highly modularised. C/C++ and Python3 are chosen as the supported languages for their generic usage in emulator development and data analysis. The library is written fully compatible with POSIX.1-2001~\cite{POSIX} standard for best portability among various UNIX-style operating systems.
+
+\section{\smurf objects\label{sec:SmurfObjects}}
+We first introduce the major objects within the \smurf framework.
+
+\subsection{Core}
+The Core object is the abstraction of the target device to be simulated. A Core is constituted of multiple Components (see below) representing either physical components in the hardware or abstracted attributes of the device.
+
+\subsection{Component}
+The Component objects are the objects that describe the Core. For comprehensiveness, they can be categorised into two categories:
+\begin{itemize}
+	\item Physical Components. These represents physically existed components within the device such as registers, flags or buses.
+	\item Virtual Components. They are used to represent arributes of the Core which does not have a correspondence physically. Some examples in this category are time in the simulation, or human readable descriptions in fetching, decoding and execution cycles. They may also be used to represent tuples of other Components, such as ``(Reg1, Reg2)'' which could be used in scenarios like multivariate leakage analysis.
+\end{itemize}
+
+The state of a Component is described by four attributes, namely name, type, length and value. Most of the Component types have their equivalence in C99. Static\footnote{a.k.a fixed length} array declaration is supported except for the STRING type, where the lenght of array\footnote{a.k.a. number of elements} is indicated by the Component length. For STRING type Component, only strings of ASCII characters are accepted as the value and the length indicates the maximum number of characters including the NULL terminator `$\backslash 0$'. A reference table is given in \Cref{tbl:ComponentTypes}.
+
+\begin{table}
+	\centering
+	\input{Tables/SmurfTypes.tex}
+	\caption{Smurf Component Types\label{tbl:ComponentTypes}}
+\end{table}
+
+\Cref{fig:CoreAndComponents} shows an example of a Core containing several Components.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.8\linewidth]{Figures/Core.eps}
+	\caption{Example of Core and Components\label{fig:CoreAndComponents}}
+\end{figure}
+
+\subsection{Trace}
+The Trace object is a sequence of Frames (see below) that records the simulation. In the \smurf framework it is the major outcome of emulation and simulation and may adopt different forms depending on the usage (e.g. to have execution details in the Execution Trace, symbolic information in the Symbolic Trace, or be applied a leakage model in the Leakage Trace).
+
+\subsection{Frame}
+A Frame is a record of the state of Core at a specific moment during the simulation. A Frame can be considered an instantiated Core where values are assigned to its Components at the moment of being record. We refer to this valued Components in a Frame as Component Instances.
+
+An important note is that the \smurf framework does not specify at which moments during the simulation that a Frame should be recorded and thus it is completely up to the choice of users (i.e. developers of the emulator and the leakage simulator). 
+
+\subsection{Dictionary\yynote{Not finalised yet...} (optional)}
+The Dictionary is the collection of all valid Symbols (see below). Note that in contrary to the Core, the Dictionary is dynamic in that it is possible to expand it with new Symbols at the runtime (i.e. during the leakage simulation).
+
+\subsection{Symbol (optional)}
+The Symbol objects represent the symbolic representations of intermediate variables during the leakage simulation that are used to generate the Symbolic Traces which are then to be imported by the proving tools. During the simulation, Components in Frames are annotated by Symbols as instructed by a symbolic annotation script specified by the user. 
+
+A Symbol needs to be first declared within Dictionary before it can be annotated by. This can be done at the runtime. \smurf also supports user defined operators over the Symbols, for instance, the user may define an XOR operator:
+\[
+	\ldquote s_1 \xor s_2 \rdquote := \text{XOR}(\ldquote s_1 \rdquote, \ldquote s_2 \rdquote)
+\]
+such that it returns a new Symbol ($\ldquote s_1 \xor s_2 \rdquote$) from two Symbols $\ldquote s_1 \rdquote$ and $\ldquote s_2 \rdquote$.
+
+Note that Dictionary and Symbols are optional that are only required if the leakage simulator intends to support the symbolic features. \Cref{fig:TraceAndFrames} gives an example of a Trace of multiple Frames with optional symbolic features.
+
+\begin{figure}
+	\centering
+	\includegraphics[width=0.9\linewidth]{Figures/Trace.eps}
+	\caption{Example of Trace and Frames with Symbolic information\label{fig:TraceAndFrames}}
+\end{figure}
+
+A tree view summary of the relationships of \smurf objects is provided in \Cref{fig:SmurfTreeview}.
+\begin{figure}
+	\dirtree{%
+		.1 \_.
+			.2 Core.
+				.3 [Component](s).
+			.2 Trace.
+				.3 [Frame](s).
+					.4 Core.
+						.5 [Component](s) - (Opt)[Symbol](s).
+			.2  (Opt) Dictionary.
+				.3 (Opt) [Symbol](s) .
+	}
+	\caption{Tree view of \smurf objects\label{fig:SmurfTreeview}}
+\end{figure}
+
+\section{\smurf Modules}
+Depending on the theme of functionality, from a high level \smurf can be divided into the following major modules:
+\begin{itemize}
+	\item The \smurf \textbf{Basic} module provides basic functionalities for manipulating various \smurf objects. Its typical usage include initialising and cleaning of \smurf objects, as well as exporting and importing the \smurf objects into various user programs. APIs within this module are supported both in C/C++ and Python3. 
+	
+	\item The \smurf \textbf{Emulator} module focuses on tasks related to the emulator, particularly about constructing a \smurf Frame from the internet data structures of the emulator and exporting them as a \smurf Trace to be read by other parties in the \smurf framework. There is also a submodule within this module called SmurfIO that provides an universal interface to simulate a virtual serial port on POSIX compatible systems. This module is supported in C/C++ only as it is designed for the usage of the emulator.
+	
+	\item \textbf{(Optional)} The \smurf \textbf{Symbolic} module  provides the functionality related to handling symbolic operations. Note that it is implemented as an optional extension that it is up to the decision of leakage simulator to support related features or not. This module is supported both in C/C++ and in Python3.
+\end{itemize}
+
+\input{SmurfBasic}
+
+\input{SmurfEmulator}
+
+\section{The \smurf Symbolic engine\label{sec:UserGuideSym}}
+
+\chapter{Developer's Guide}
+
+\printbibliography
+
+\end{document}          

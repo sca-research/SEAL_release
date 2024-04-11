@@ -1,0 +1,37 @@
+{
+    "version": "2",
+    "components": {
+        "Flags": {
+            "type": "BOOL",
+            "len": 3
+        },
+        "RegA": {
+            "type": "OCTET",
+            "len": 1
+        },
+        "RegB": {
+            "type": "OCTET",
+            "len": 4
+        },
+        "I16Regs": {
+            "type": "INT16",
+            "len": 2
+        },
+        "Ui16Regs": {
+            "type": "UINT16",
+            "len": 2
+        },
+        "ExeIns": {
+            "type": "STRING",
+            "len": 10
+        },
+        "Mode": {
+            "type": "INT32",
+            "len": 1
+        },
+        "CycleCount": {
+            "type": "UINT32",
+            "len": 1
+        }
+    }
+}

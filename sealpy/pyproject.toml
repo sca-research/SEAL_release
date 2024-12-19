@@ -12,7 +12,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
-dependencies=["numpy", "scipy", "tqdm", "base", "parse", "collections"]
+dependencies=["numpy", "scipy", "tqdm", "base", "parse"]
 
 [project.urls]
 "Homepage" = "https://github.com/sca-research/smurf"

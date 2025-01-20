@@ -1,7 +1,7 @@
 LIBS=cjson
 LDLIBS=$(LIBS:%=-l%)
 SOFLAGS=-shared
-OBJFLAGS=-g -Wall -c -fPIC
+OBJFLAGS=-g -Wall -c -fPIC -O2
 CXX=g++
 
 SEAL_SO_DEP=seal.o symbolic.o sealutl.o chain.o frame.o trace.o core.o
